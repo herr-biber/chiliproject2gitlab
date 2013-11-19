@@ -112,7 +112,10 @@ for issue in chiliproject_issues:
 for issue in chiliproject_issues:
     author = issue['Author'].lower()
 
-    labels = [issue['Priority'], issue['Tracker']]
+    labels = []
+    labels.append('Priority ' + issue['Priority'])
+    labels.append('Type ' + issue['Tracker'])
+    labels.append(issue['Category'])
 
     # required
     gitlab_project_id = project_mappings[issue['Project'].lower()]

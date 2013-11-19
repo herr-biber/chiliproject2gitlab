@@ -67,7 +67,7 @@ class GitlabWrapper:
         last_issue = r.json()[0]
         return last_issue
 
-    def close_issue(self, project_id, issue_id):
+    def close_issue(self, project_id, issue_id, author):
         print('  Closing issue...')
         r = requests.put('%s/projects/%d/issues/%d?private_token=%s' % (self._api_url, project_id, issue_id, self._private_tokens[author]), {'state_event': 'close'})
         assert r.status_code == 200

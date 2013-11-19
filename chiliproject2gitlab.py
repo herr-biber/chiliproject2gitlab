@@ -58,7 +58,7 @@ class GitlabWrapper:
         print('Creating new issue:', issue['title'])
         r = requests.post('%s/projects/%d/issues?private_token=%s' % (self._api_url, project_id, self._private_tokens[author]), issue)
         assert r.status_code == 201
-        return r.json()['id']
+        return r.json()
 
     def close_issue(self, project_id, issue_id, author):
         print('  Closing issue...')
@@ -130,11 +130,12 @@ for issue in chiliproject_issues:
     if issue['Assignee']:  # nonempty
         gitlab_issue['assignee_id'] = gitlab.get_user_id(issue['Assignee'].lower())
 
-    last_issue_id = gitlab.add_issue(gitlab_project_id, gitlab_issue, author)
+    last_issue = gitlab.add_issue(gitlab_project_id, gitlab_issue, author)
+
 
     # close issue
     if issue['Status'] == 'Closed':
-        gitlab.close_issue(gitlab_project_id, last_issue_id, author)
+        gitlab.close_issue(gitlab_project_id, last_issue['id'], author)
 
     # TODO Remove me, when ready
     break

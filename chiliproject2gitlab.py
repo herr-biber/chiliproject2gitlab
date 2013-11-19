@@ -71,6 +71,9 @@ class GitlabWrapper:
 issue_file = open('export.csv', 'r', encoding='ISO-8859-1')
 # list comprehension to copy data.
 chiliproject_issues = [line for line in csv.DictReader(issue_file, delimiter=',', quotechar='"')]
+# sort 'chronologically'
+chiliproject_issues = sorted(chiliproject_issues, key=lambda d: int(d['#']))
+
 issue_file.close()
 
 # get chiliproject project names. Lowercase

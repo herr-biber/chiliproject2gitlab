@@ -3,11 +3,12 @@ from __future__ import print_function
 import requests
 import csv
 import sys
+
 try:
-    from settings import PRIVATE_TOKEN, API_URL, manual_mapping
+    from settings import PRIVATE_TOKENS, API_URL, manual_mapping
 except ImportError:
     print("You need to create a settings.py file with the following content:")
-    print("PRIVATE_TOKEN = 'gitlab private token'")
+    print("PRIVATE_TOKENS = {'lowercase name': 'gitlab private token'")
     print("API_URL = 'gitlab api url'")
     print("manual_mapping = {'chiliprojectname1': 'gitlab name1', 'chiliproject name2': 'gitlab name2'}")
     print("\n")
@@ -15,13 +16,14 @@ except ImportError:
 
 class GitlabWrapper:
 
-    def __init__(self, api_url, private_token):
+    def __init__(self, api_url, private_tokens):
         self._api_url = api_url
-        self._private_token = private_token
+        self._private_tokens = private_tokens
+        self._private_token_for_reading = private_tokens['markus roth']
 
         # get gitlab project names and ids
         # get first 100 gitlab projects
-        r = requests.get('%s/projects?private_token=%s&per_page=100' % (self._api_url, self._private_token))
+        r = requests.get('%s/projects?private_token=%s&per_page=100' % (self._api_url, self._private_token_for_reading))
         assert r.status_code == 200
 
         self._project_ids = {}
@@ -32,7 +34,7 @@ class GitlabWrapper:
             raise NotImplementedError("Gitlab API restricts page_sizes to 100. Implement successive requests to get all your projects")
 
         # get user names and ids
-        r = requests.get('%s/users?private_token=%s&per_page=100' % (self._api_url, self._private_token))
+        r = requests.get('%s/users?private_token=%s&per_page=100' % (self._api_url, self._private_token_for_reading))
         assert r.status_code == 200
         assert len(r.json()) != 100
         self._user_ids = {}
@@ -51,23 +53,23 @@ class GitlabWrapper:
     def get_user_names(self):
         return self._user_ids.keys()
 
-    def add_issue(self, project_id, issue):
+    def add_issue(self, project_id, issue, author):
         # create new issue
         print('Creating new issue:', issue['title'])
-        r = requests.post('%s/projects/%d/issues?private_token=%s' % (self._api_url, project_id, self._private_token), issue)
+        r = requests.post('%s/projects/%d/issues?private_token=%s' % (self._api_url, project_id, self._private_tokens[author]), issue)
         assert r.status_code == 201
 
-    def get_last_issue(self, project_id):
+    def get_last_issue(self, project_id, author):
         # get issue id of just created issue
         # newest issues first
-        r = requests.get('%s/projects/%d/issues?private_token=%s&per_page=1' % (self._api_url, project_id, self._private_token))
+        r = requests.get('%s/projects/%d/issues?private_token=%s&per_page=1' % (self._api_url, project_id, self._private_token_for_reading))
         assert r.status_code == 200
         last_issue = r.json()[0]
         return last_issue
 
     def close_issue(self, project_id, issue_id):
         print('  Closing issue...')
-        r = requests.put('%s/projects/%d/issues/%d?private_token=%s' % (self._api_url, project_id, issue_id, self._private_token), {'state_event': 'close'})
+        r = requests.put('%s/projects/%d/issues/%d?private_token=%s' % (self._api_url, project_id, issue_id, self._private_tokens[author]), {'state_event': 'close'})
         assert r.status_code == 200
 
 
@@ -83,7 +85,7 @@ for chiliproject_issue in chiliproject_issues:
     chiliproject_project_names.add(chiliproject_issue['Project'].lower())
 
 # gitlab wrapper
-gitlab = GitlabWrapper(API_URL, PRIVATE_TOKEN)
+gitlab = GitlabWrapper(API_URL, PRIVATE_TOKENS)
 
 # debug info
 project_names_not_in_gitlab = chiliproject_project_names - gitlab.get_project_names()
@@ -100,8 +102,16 @@ for p in chiliproject_project_names:
     else:
         project_mappings[p] = gitlab.get_project_id(p)
 
+# check authors in private_tokens
+for issue in chiliproject_issues:
+    author = issue['Author'].lower()
+    if author not in PRIVATE_TOKENS:
+        raise KeyError('Author "%s" not found in PRIVATE_TOKENS' % author)
+
 # add issues to gitlab
 for issue in chiliproject_issues:
+    author = issue['Author'].lower()
+
     labels = [issue['Priority'], issue['Tracker']]
 
     # required
@@ -119,16 +129,16 @@ for issue in chiliproject_issues:
     if issue['Assignee']: # nonempty
         gitlab_issue['assignee_id'] = gitlab.get_user_id(issue['Assignee'].lower())
 
-    gitlab.add_issue(gitlab_project_id, gitlab_issue)
+    gitlab.add_issue(gitlab_project_id, gitlab_issue, author)
 
     # make sure, we have the proper issue
-    last_issue = gitlab.get_last_issue(gitlab_project_id)
+    last_issue = gitlab.get_last_issue(gitlab_project_id, author)
     assert last_issue['title'] == gitlab_issue['title']
     assert last_issue['state'] == 'opened'
 
     # close issue
     if issue['Status'] == 'Closed':
-        gitlab.close_issue(gitlab_project_id, last_issue['id'])
+        gitlab.close_issue(gitlab_project_id, last_issue['id'], author)
 
     # TODO Remove me, when ready
     break

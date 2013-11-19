@@ -3,6 +3,7 @@ from __future__ import print_function
 import requests
 import csv
 import sys
+import json
 
 try:
     from settings import PRIVATE_TOKENS, API_URL, manual_mapping
@@ -101,6 +102,8 @@ for issue in chiliproject_issues:
     if author not in PRIVATE_TOKENS:
         raise KeyError('Author "%s" not found in PRIVATE_TOKENS' % author)
 
+gitlab_new_issue_timestamps = {}
+
 # add issues to gitlab
 for issue in chiliproject_issues:
     author = issue['Author'].lower()
@@ -132,6 +135,10 @@ for issue in chiliproject_issues:
 
     last_issue = gitlab.add_issue(gitlab_project_id, gitlab_issue, author)
 
+    gitlab_new_issue_timestamps[last_issue['id']] = {
+        'created': issue['Created'],
+        'updated': issue['Updated']
+    }
 
     # close issue
     if issue['Status'] == 'Closed':
@@ -139,3 +146,8 @@ for issue in chiliproject_issues:
 
     # TODO Remove me, when ready
     break
+
+
+# TODO convert to format 2013-11-19T12:25:15Z
+with open('new_issue_timestamps.json', 'w') as fd:
+    json.dump(gitlab_new_issue_timestamps, fd, indent=4, sort_keys=True)

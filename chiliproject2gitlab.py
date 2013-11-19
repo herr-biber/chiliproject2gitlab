@@ -119,13 +119,12 @@ for issue in chiliproject_issues:
     gitlab_issue = {}
     gitlab_issue['title'] = issue['Subject']
 
-    # optional
-    if issue['Description']:
-        gitlab_issue['description'] = issue['Description']
-        gitlab_issue['description'] + '\n\n'
-        for k in ('#', 'Created', 'Due date', '% Done', 'Updated'):
-            if issue[k]:
-                gitlab_issue['description'] + '%s: %s\n' % (k, issue[k])
+    # description
+    gitlab_issue['description'] = issue['Description']
+    gitlab_issue['description'] + '\n\n'
+    for k in ('#', 'Created', 'Due date', '% Done', 'Updated'):
+        if issue[k]:
+            gitlab_issue['description'] + '%s: %s\n' % (k, issue[k])
 
     if labels:
         gitlab_issue['labels'] = ','.join(labels)

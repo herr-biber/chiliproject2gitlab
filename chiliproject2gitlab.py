@@ -13,24 +13,63 @@ except ImportError:
     print("\n")
     sys.exit(-1)
 
-# get gitlab project names and ids
-# get first 100 gitlab projects
-gitlab_project_names = {}
-r = requests.get('%s/projects?private_token=%s&per_page=100' % (API_URL, PRIVATE_TOKEN))
-assert r.status_code == 200
-for project in r.json():
-    gitlab_project_names[project['name'].lower()] = project['id']
+class GitlabWrapper:
 
-if len(gitlab_project_names) == 100:
-    raise NotImplementedError("Gitlab API restricts page_sizes to 100. Implement successive requests to get all your projects")
+    def __init__(self, api_url, private_token):
+        self._api_url = api_url
+        self._private_token = private_token
 
-# get gitlab user names and ids
-r = requests.get('%s/users?private_token=%s&per_page=100' % (API_URL, PRIVATE_TOKEN))
-assert r.status_code == 200
-assert len(r.json()) != 100
-gitlab_assignees = {}
-for user in r.json():
-    gitlab_assignees[user['name'].lower()] = user['id']
+        # get gitlab project names and ids
+        # get first 100 gitlab projects
+        r = requests.get('%s/projects?private_token=%s&per_page=100' % (self._api_url, self._private_token))
+        assert r.status_code == 200
+
+        self._project_ids = {}
+        for project in r.json():
+            self._project_ids[project['name'].lower()] = project['id']
+
+        if len(self._project_ids) == 100:
+            raise NotImplementedError("Gitlab API restricts page_sizes to 100. Implement successive requests to get all your projects")
+
+        # get user names and ids
+        r = requests.get('%s/users?private_token=%s&per_page=100' % (self._api_url, self._private_token))
+        assert r.status_code == 200
+        assert len(r.json()) != 100
+        self._user_ids = {}
+        for user in r.json():
+            self._user_ids[user['name'].lower()] = user['id']
+
+    def get_project_id(self, project_name):
+        return self._project_ids[project_name]
+
+    def get_project_names(self):
+        return self._project_ids.keys()
+
+    def get_user_id(self, user_name):
+        return self._user_ids[user_name]
+
+    def get_user_names(self):
+        return self._user_ids.keys()
+
+    def add_issue(self, project_id, issue):
+        # create new issue
+        print('Creating new issue:', issue['title'])
+        r = requests.post('%s/projects/%d/issues?private_token=%s' % (self._api_url, project_id, self._private_token), issue)
+        assert r.status_code == 201
+
+    def get_last_issue(self, project_id):
+        # get issue id of just created issue
+        # newest issues first
+        r = requests.get('%s/projects/%d/issues?private_token=%s&per_page=1' % (self._api_url, project_id, self._private_token))
+        assert r.status_code == 200
+        last_issue = r.json()[0]
+        return last_issue
+
+    def close_issue(self, project_id, issue_id):
+        print('  Closing issue...')
+        r = requests.put('%s/projects/%d/issues/%d?private_token=%s' % (self._api_url, project_id, issue_id, self._private_token), {'state_event': 'close'})
+        assert r.status_code == 200
+
 
 # read chiliproject issues.
 issue_file = open('export.csv', 'r', encoding='ISO-8859-1')
@@ -38,13 +77,16 @@ issue_file = open('export.csv', 'r', encoding='ISO-8859-1')
 chiliproject_issues = [line for line in csv.DictReader(issue_file, delimiter=',', quotechar='"')]
 issue_file.close()
 
-# get gitlab project names. Lowercase
+# get chiliproject project names. Lowercase
 chiliproject_project_names = set()
 for chiliproject_issue in chiliproject_issues:
     chiliproject_project_names.add(chiliproject_issue['Project'].lower())
 
+# gitlab wrapper
+gitlab = GitlabWrapper(API_URL, PRIVATE_TOKEN)
+
 # debug info
-project_names_not_in_gitlab = chiliproject_project_names - set(gitlab_project_names)
+project_names_not_in_gitlab = chiliproject_project_names - gitlab.get_project_names()
 unmapped_project_names = project_names_not_in_gitlab - set(manual_mapping)
 if len(unmapped_project_names) > 0:
     raise IOError('No known mapping for chiliproject project names: ' + ' '.join(sorted(unmapped_project_names)))
@@ -54,9 +96,9 @@ project_mappings = {}
 for p in chiliproject_project_names:
     # prefer manual mapping
     if p in manual_mapping:
-        project_mappings[p] = gitlab_project_names[manual_mapping[p]]
+        project_mappings[p] = gitlab.get_project_id(manual_mapping[p])
     else:
-        project_mappings[p] = gitlab_project_names[p]
+        project_mappings[p] = gitlab.get_project_id(p)
 
 # add issues to gitlab
 for issue in chiliproject_issues:
@@ -75,29 +117,18 @@ for issue in chiliproject_issues:
         gitlab_issue['labels'] = ','.join(labels)
 
     if issue['Assignee']: # nonempty
-        gitlab_issue['assignee_id'] = gitlab_assignees[issue['Assignee'].lower()]
+        gitlab_issue['assignee_id'] = gitlab.get_user_id(issue['Assignee'].lower())
 
-    # create new issue
-    print('Creating new issue:', issue['Subject'])
-    r = requests.post('%s/projects/%d/issues?private_token=%s' % (API_URL, gitlab_project_id, PRIVATE_TOKEN), gitlab_issue)
-    assert r.status_code == 201
-
-    # get issue id of just created issue
-    # newest issues first
-    r = requests.get('%s/projects/%d/issues?private_token=%s&per_page=1' % (API_URL, gitlab_project_id, PRIVATE_TOKEN))
-    assert r.status_code == 200
-    last_issue = r.json()[0]
-    last_issue_id = last_issue['id']
+    gitlab.add_issue(gitlab_project_id, gitlab_issue)
 
     # make sure, we have the proper issue
+    last_issue = gitlab.get_last_issue(gitlab_project_id)
     assert last_issue['title'] == gitlab_issue['title']
     assert last_issue['state'] == 'opened'
 
     # close issue
     if issue['Status'] == 'Closed':
-        print('  Closing issue...')
-        r = requests.put('%s/projects/%d/issues/%d?private_token=%s' % (API_URL, gitlab_project_id, last_issue_id, PRIVATE_TOKEN), {'state_event': 'close'})
-        assert r.status_code == 200
+        gitlab.close_issue(gitlab_project_id, last_issue['id'])
 
     # TODO Remove me, when ready
     break

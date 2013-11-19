@@ -58,14 +58,7 @@ class GitlabWrapper:
         print('Creating new issue:', issue['title'])
         r = requests.post('%s/projects/%d/issues?private_token=%s' % (self._api_url, project_id, self._private_tokens[author]), issue)
         assert r.status_code == 201
-
-    def get_last_issue(self, project_id, author):
-        # get issue id of just created issue
-        # newest issues first
-        r = requests.get('%s/projects/%d/issues?private_token=%s&per_page=1' % (self._api_url, project_id, self._private_token_for_reading))
-        assert r.status_code == 200
-        last_issue = r.json()[0]
-        return last_issue
+        return r.json()['id']
 
     def close_issue(self, project_id, issue_id, author):
         print('  Closing issue...')
@@ -133,19 +126,14 @@ for issue in chiliproject_issues:
     if labels:
         gitlab_issue['labels'] = ','.join(labels)
 
-    if issue['Assignee']: # nonempty
+    if issue['Assignee']:  # nonempty
         gitlab_issue['assignee_id'] = gitlab.get_user_id(issue['Assignee'].lower())
 
-    gitlab.add_issue(gitlab_project_id, gitlab_issue, author)
-
-    # make sure, we have the proper issue
-    last_issue = gitlab.get_last_issue(gitlab_project_id, author)
-    assert last_issue['title'] == gitlab_issue['title']
-    assert last_issue['state'] == 'opened'
+    last_issue_id = gitlab.add_issue(gitlab_project_id, gitlab_issue, author)
 
     # close issue
     if issue['Status'] == 'Closed':
-        gitlab.close_issue(gitlab_project_id, last_issue['id'], author)
+        gitlab.close_issue(gitlab_project_id, last_issue_id, author)
 
     # TODO Remove me, when ready
     break

@@ -69,7 +69,7 @@ class GitlabWrapper:
 
 # read chiliproject issues.
 issue_file = open('export.csv', 'r', encoding='ISO-8859-1')
-# dict comprehension to copy data.
+# list comprehension to copy data.
 chiliproject_issues = [line for line in csv.DictReader(issue_file, delimiter=',', quotechar='"')]
 issue_file.close()
 

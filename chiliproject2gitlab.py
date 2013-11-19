@@ -56,7 +56,6 @@ class GitlabWrapper:
 
     def add_issue(self, project_id, issue, author):
         # create new issue
-        print('Creating new issue:', issue['title'])
         r = requests.post('%s/projects/%d/issues?private_token=%s' % (self._api_url, project_id, self._private_tokens[author]), issue)
         assert r.status_code == 201
         return r.json()

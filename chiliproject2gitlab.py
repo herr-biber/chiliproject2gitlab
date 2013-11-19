@@ -61,7 +61,6 @@ class GitlabWrapper:
         return r.json()
 
     def close_issue(self, project_id, issue_id, author):
-        print('  Closing issue...')
         r = requests.put('%s/projects/%d/issues/%d?private_token=%s' % (self._api_url, project_id, issue_id, self._private_tokens[author]), {'state_event': 'close'})
         assert r.status_code == 200
 
@@ -144,6 +143,7 @@ for issue in chiliproject_issues:
 
     # close issue
     if issue['Status'] == 'Closed':
+        print('  Closing issue...')
         gitlab.close_issue(gitlab_project_id, last_issue['id'], author)
 
     # TODO Remove me, when ready

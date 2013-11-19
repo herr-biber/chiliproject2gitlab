@@ -123,7 +123,7 @@ for issue in chiliproject_issues:
     # description
     gitlab_issue['description'] = issue['Description']
     gitlab_issue['description'] += '\n\n'
-    for k in ('#', 'Created', 'Due date', '% Done', 'Updated'):
+    for k in ('#', 'Created', 'Updated', 'Due date', '% Done'):
         if issue[k]:
             gitlab_issue['description'] += '%s: %s\n' % (k, issue[k])
 

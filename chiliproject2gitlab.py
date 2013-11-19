@@ -104,6 +104,7 @@ for issue in chiliproject_issues:
 # add issues to gitlab
 for issue in chiliproject_issues:
     author = issue['Author'].lower()
+    print('Adding issue "%s" by "%s"' % (issue['Subject'], author))
 
     labels = []
     labels.append('Priority ' + issue['Priority'])

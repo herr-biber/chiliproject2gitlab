@@ -146,10 +146,6 @@ for issue in chiliproject_issues:
         print('  Closing issue...')
         gitlab.close_issue(gitlab_project_id, last_issue['id'], author)
 
-    # TODO Remove me, when ready
-    break
-
-
 # TODO convert to format 2013-11-19T12:25:15Z
 with open('new_issue_timestamps.json', 'w') as fd:
     json.dump(gitlab_new_issue_timestamps, fd, indent=4, sort_keys=True)

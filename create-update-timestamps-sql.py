@@ -1,3 +1,4 @@
+
 import json
 
 pattern_notes = 'UPDATE  `gitlab`.`notes` \
@@ -39,3 +40,6 @@ for id, timestamps in ids.items():
 for id, timestamps in ids.items():
     print(pattern_events_create_issue % (timestamps['created'], timestamps['created'], int(id)))
     print(pattern_events_close_issue  % (timestamps['updated'], timestamps['updated'], int(id)))
+
+for id, timestamps in ids.items():
+    print(pattern_taggings % (timestamps['created'], int(id)))
